@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Night HQ</title>
+
+    <!-- 8-bit pixel font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- NES.css retro UI kit -->
+    <link
+      href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- our tweaks -->
+    <link href="styles.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div class="wrap">
+      <h1 class="page-title">Game Night HQ</h1>
+
+      <div id="status" class="nes-container is-rounded status" hidden></div>
+
+      <!-- ===================== VOTE ===================== -->
+      <section class="nes-container with-title is-rounded">
+        <p class="title">Next game vote</p>
+        <div id="poll">Loading&hellip;</div>
+      </section>
+
+      <!-- ===================== LOG A GAME ===================== -->
+      <section class="nes-container with-title is-rounded">
+        <p class="title">Log a game night</p>
+
+        <div class="field">
+          <label for="g-date">Date</label>
+          <input type="date" id="g-date" class="nes-input" />
+        </div>
+
+        <div class="field">
+          <label for="g-game">Game</label>
+          <input
+            type="text"
+            id="g-game"
+            class="nes-input"
+            placeholder="Wingspan"
+          />
+        </div>
+
+        <p class="field-label">Players &amp; scores</p>
+        <div id="players"></div>
+        <button type="button" class="nes-btn" id="add-player">
+          + Add player
+        </button>
+
+        <div class="field">
+          <label for="g-notes">Notes</label>
+          <input
+            type="text"
+            id="g-notes"
+            class="nes-input"
+            placeholder="optional"
+          />
+        </div>
+
+        <button type="button" class="nes-btn is-primary" id="save-session">
+          Save result
+        </button>
+      </section>
+
+      <!-- ===================== LEADERBOARD ===================== -->
+      <section class="nes-container with-title is-rounded">
+        <p class="title">Leaderboard</p>
+        <div id="leaderboard">Loading&hellip;</div>
+      </section>
+
+      <!-- ===================== HISTORY ===================== -->
+      <section class="nes-container with-title is-rounded">
+        <p class="title">Recent games</p>
+        <div id="history">Loading&hellip;</div>
+      </section>
+
+      <p class="footer">Roll for initiative.</p>
+    </div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
