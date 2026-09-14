@@ -1,17 +1,17 @@
-/* Board game meetup — retro styling on top of NES.css (styles.css)
-   Goes in your GitHub repo next to index.html. */
+/* Rigby's Games — retro styling on top of NES.css (styles.css) */
 
 :root {
   --ink: #e6e6e6;
   --panel: #2b3038;
-  --accent: #92cc41; /* nes green */
-  --danger: #e76e55; /* nes red  */
+  --accent: #92cc41; /* green */
+  --accent-2: #209cee; /* blue  */
+  --danger: #e76e55; /* red   */
+  --gold: #f7d51d; /* yellow */
 }
 
 * {
   box-sizing: border-box;
 }
-
 html {
   image-rendering: pixelated;
 }
@@ -23,7 +23,6 @@ body {
   color: var(--ink);
   margin: 0;
   padding: 16px;
-  /* subtle checkerboard so the panels pop off the background */
   background-color: #1b1f24;
   background-image: repeating-linear-gradient(
     45deg,
@@ -33,24 +32,45 @@ body {
 }
 
 .wrap {
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
 }
 
-/* --- headings & structure --- */
+/* --- title + next-night banner --- */
 .page-title {
   text-align: center;
-  font-size: 18px;
-  line-height: 1.6;
-  margin: 6px 0 22px;
+  font-size: 22px;
+  line-height: 1.5;
+  margin: 6px 0 14px;
   color: var(--accent);
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0 auto 24px;
+  padding: 14px 16px;
+  max-width: 560px;
+  color: var(--gold);
+  border: 4px solid var(--gold);
+}
+.subtitle .ngn-value {
+  display: block;
+  margin-top: 10px;
+  color: var(--ink);
 }
 
 section {
   margin-bottom: 22px;
   background: var(--panel);
 }
-
+.hint {
+  font-size: 9px;
+  opacity: 0.75;
+  line-height: 1.7;
+  margin: 0 0 14px;
+}
 .footer {
   text-align: center;
   font-size: 9px;
@@ -70,7 +90,10 @@ section {
 .nes-input {
   font-size: 11px;
 }
-
+.nes-btn {
+  margin: 8px 8px 8px 0;
+  font-size: 10px;
+}
 .player-row {
   display: flex;
   gap: 8px;
@@ -90,14 +113,6 @@ section {
   gap: 6px;
   white-space: nowrap;
 }
-.player-row .p-del {
-  flex: 0 0 auto;
-}
-
-.nes-btn {
-  margin: 8px 8px 8px 0;
-  font-size: 10px;
-}
 
 /* --- status banner --- */
 .status {
@@ -113,47 +128,115 @@ section {
   background: var(--danger);
 }
 
-/* --- poll --- */
-.poll-q {
-  margin: 4px 0 14px;
+/* --- champions list --- */
+.champ-head,
+.champ-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 4px;
 }
-.poll-option {
+.champ-head {
+  font-size: 9px;
+  opacity: 0.7;
+  border-bottom: 2px solid #3a3f47;
+}
+.champ-row {
+  font-size: 10px;
+  border-bottom: 1px solid #23272e;
+}
+.champ-row .date {
+  opacity: 0.7;
+}
+
+/* hoverable/tappable cell with a popover of the full scoreboard */
+.cell {
+  position: relative;
+}
+.cell.has-detail {
+  cursor: help;
+  color: var(--accent);
+}
+.cell .pop {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 190px;
+  max-width: 260px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #12151a;
+  border: 4px solid var(--accent);
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 1.9;
+  text-align: left;
+}
+.cell.has-detail:hover .pop,
+.cell.has-detail:focus .pop,
+.cell.has-detail:focus-within .pop {
+  display: block;
+}
+.pop .pop-title {
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.pop .pop-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+.pop .pop-win {
+  color: var(--gold);
+}
+
+/* --- voting --- */
+.suggest-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.suggest-row .nes-input {
+  flex: 1 1 160px;
+}
+
+.nom {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 10px 0;
+  flex-wrap: wrap;
+  margin: 12px 0;
 }
-.poll-option .nes-btn {
+.nom .nes-btn {
   flex: 0 0 auto;
-  min-width: 120px;
+  min-width: 160px;
   text-align: left;
 }
-.poll-bar {
+.nom-bar {
   height: 14px;
-  background: var(--accent);
+  background: var(--accent-2);
   min-width: 2px;
   image-rendering: pixelated;
 }
-.poll-count {
-  min-width: 28px;
-  text-align: right;
+.nom-count {
+  min-width: 56px;
+}
+.nom-by {
+  flex-basis: 100%;
+  margin: -4px 0 0 2px;
+  font-size: 8px;
+  opacity: 0.55;
 }
 
-/* --- tables & history --- */
-.nes-table {
-  width: 100%;
-  font-size: 9px;
-}
-.history-row p {
-  margin: 4px 0;
-}
-.history-scores {
-  color: var(--accent);
-}
-
-/* --- keyboard focus: keep it visible (quality floor) --- */
+/* --- keyboard focus (quality floor) --- */
 .nes-btn:focus-visible,
-.nes-input:focus-visible {
+.nes-input:focus-visible,
+.cell:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
@@ -165,12 +248,14 @@ section {
     padding: 10px;
   }
   .page-title {
-    font-size: 15px;
+    font-size: 17px;
   }
-  .nes-table {
-    font-size: 8px;
+  .champ-head,
+  .champ-row {
+    grid-template-columns: 1.3fr 1fr 0.7fr;
+    font-size: 9px;
   }
-  .poll-option .nes-btn {
-    min-width: 96px;
+  .nom .nes-btn {
+    min-width: 120px;
   }
 }

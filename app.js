@@ -1,12 +1,12 @@
-/* Board game meetup — front-end logic (app.js). Goes in your GitHub repo. */
+/* Rigby's Games — front-end logic (app.js). Goes in your GitHub repo. */
 
 // 1) Paste your Apps Script web-app /exec URL here after deploying Code.gs:
-const API_URL = https://script.google.com/macros/s/AKfycby-gQkBNdSh2pc1v-iZvJgi8Euf81zf9wSXYvcYgKut-EAmPejPkiTm4BkWccavSxNm/exec;
+const API_URL = "PASTE_YOUR_WEB_APP_EXEC_URL_HERE";
 
 // 2) If you set a SECRET in Code.gs, put the same value here (else leave ""):
 const SECRET = "";
 
-/* ---- per-browser voter id (so one person = one vote per poll) ---- */
+/* ---- per-browser voter id (one person = one vote per game) ---- */
 function voterId() {
   let id = localStorage.getItem("gn_voter");
   if (!id) {
@@ -17,7 +17,7 @@ function voterId() {
 }
 
 /* ---- tiny DOM helpers ---- */
-const $ = (sel) => document.querySelector(sel);
+const $ = (s) => document.querySelector(s);
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -38,14 +38,13 @@ function status(msg, kind) {
   if (kind === "ok") setTimeout(() => (s.hidden = true), 2500);
 }
 
-/* ---- API calls ---- */
+/* ---- API ---- */
 async function getData() {
   const res = await fetch(API_URL, { method: "GET" });
   const body = await res.json();
   if (!body.ok) throw new Error(body.error || "load failed");
   return body.data;
 }
-
 async function post(action, payload) {
   const res = await fetch(API_URL, {
     method: "POST",
@@ -59,148 +58,174 @@ async function post(action, payload) {
   return body;
 }
 
-/* ---- rendering ---- */
+/* ---- render ---- */
 function render(data) {
-  renderPoll(data);
-  renderLeaderboard(data);
-  renderHistory(data);
+  renderNextNight(data);
+  renderWinners(data);
+  renderNoms(data);
 }
 
-function renderPoll(data) {
-  const box = $("#poll");
+function renderNextNight(data) {
+  const row = (data.settings || []).find(
+    (s) => String(s.key).trim().toLowerCase() === "next_game_night"
+  );
+  const val = row && String(row.value).trim();
+  $("#next-night").querySelector(".ngn-value").textContent = val || "TBD";
+}
+
+/* --- champions --- */
+function scoresBySession(data) {
+  const map = {};
+  (data.scores || []).forEach((s) => {
+    (map[s.session_id] = map[s.session_id] || []).push(s);
+  });
+  return map;
+}
+
+function winnersOf(scores) {
+  const flagged = scores.filter((s) => String(s.won).toLowerCase() === "yes");
+  if (flagged.length) return flagged.map((s) => s.player);
+  if (!scores.length) return [];
+  const top = scores
+    .slice()
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))[0];
+  return top && top.player ? [top.player] : [];
+}
+
+function popover(scores) {
+  const sorted = scores
+    .slice()
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+  const lines = sorted
+    .map((s) => {
+      const win = String(s.won).toLowerCase() === "yes";
+      return (
+        `<span class="pop-line${win ? " pop-win" : ""}">` +
+        `<span>${esc(s.player)}${win ? " \u2605" : ""}</span>` +
+        `<span>${Number(s.score) || 0}</span></span>`
+      );
+    })
+    .join("");
+  return (
+    `<span class="pop"><span class="pop-title">Full results</span>` +
+    (lines || "No scores recorded.") +
+    `</span>`
+  );
+}
+
+function renderWinners(data) {
+  const box = $("#winners");
+  const byId = scoresBySession(data);
+  const sessions = (data.sessions || [])
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  if (!sessions.length) {
+    box.innerHTML = "<p>No results yet — log one below to crown a champion.</p>";
+    return;
+  }
+
+  box.innerHTML = "";
+  box.appendChild(
+    el("div", "champ-head", "<span>Game</span><span>Winner</span><span>Date</span>")
+  );
+
+  sessions.forEach((sn) => {
+    const scores = byId[sn.id] || [];
+    const winners = winnersOf(scores).map(esc).join(" &amp; ") || "&mdash;";
+    const hasDetail = scores.length > 0;
+    const pop = hasDetail ? popover(scores) : "";
+    const cls = hasDetail ? "cell has-detail" : "cell";
+    const tab = hasDetail ? ' tabindex="0"' : "";
+
+    const row = el("div", "champ-row");
+    row.innerHTML =
+      `<span class="${cls}"${tab}>${esc(sn.game)}${pop}</span>` +
+      `<span class="${cls}"${tab}>${winners}${pop}</span>` +
+      `<span class="date">${esc(sn.date)}</span>`;
+    box.appendChild(row);
+  });
+}
+
+/* --- voting (approval) --- */
+function renderNoms(data) {
+  const box = $("#noms");
   box.innerHTML = "";
 
-  const open = (data.polls || []).filter(
-    (p) => String(p.status).toLowerCase() === "open"
-  );
-  if (!open.length) {
+  const noms = (data.nominations || [])
+    .slice()
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+
+  if (!noms.length) {
     box.appendChild(
-      el("p", null, "No open vote right now — add a row to the Polls tab to start one.")
+      el("p", null, "No games suggested yet — add the first one above.")
     );
     return;
   }
 
-  const poll = open[0];
-  const options = String(poll.options || "")
-    .split("|")
-    .map((o) => o.trim())
-    .filter(Boolean);
-
-  const votes = (data.votes || []).filter(
-    (v) => String(v.poll_id) === String(poll.id)
-  );
+  const votes = data.votes || [];
   const counts = {};
-  options.forEach((o) => (counts[o] = 0));
   votes.forEach((v) => {
-    if (counts[v.option] != null) counts[v.option]++;
+    counts[v.nomination_id] = (counts[v.nomination_id] || 0) + 1;
   });
-  const max = Math.max(1, ...options.map((o) => counts[o]));
-  const mine = votes.find((v) => v.voter_id === voterId());
+  const mine = new Set(
+    votes.filter((v) => v.voter_id === voterId()).map((v) => String(v.nomination_id))
+  );
+  const max = Math.max(1, ...noms.map((n) => counts[n.id] || 0));
 
-  box.appendChild(el("p", "poll-q", esc(poll.title || "Vote")));
+  noms.forEach((n) => {
+    const count = counts[n.id] || 0;
+    const chosen = mine.has(String(n.id));
 
-  options.forEach((opt) => {
-    const row = el("div", "poll-option");
-    const chosen = mine && mine.option === opt;
-    const btn = el("button", "nes-btn" + (chosen ? " is-success" : ""), esc(opt));
+    const row = el("div", "nom");
+    const btn = el(
+      "button",
+      "nes-btn" + (chosen ? " is-success" : ""),
+      (chosen ? "\u2713 " : "") + esc(n.game)
+    );
     btn.onclick = async () => {
       try {
-        status("Saving vote\u2026");
-        await post("cast_vote", { poll_id: poll.id, option: opt, voter_id: voterId() });
-        status("Vote saved.", "ok");
+        await post("toggle_vote", { nomination_id: n.id, voter_id: voterId() });
         refresh();
       } catch (e) {
         status(e.message, "err");
       }
     };
-    const bar = el("span", "poll-bar");
-    bar.style.width = Math.round((counts[opt] / max) * 150) + "px";
-    row.append(btn, bar, el("span", "poll-count", String(counts[opt])));
-    box.appendChild(row);
-  });
-}
 
-function renderLeaderboard(data) {
-  const box = $("#leaderboard");
-  const agg = {};
-  (data.scores || []).forEach((s) => {
-    const p = s.player;
-    if (!p) return;
-    if (!agg[p]) agg[p] = { player: p, games: 0, wins: 0, points: 0 };
-    agg[p].games++;
-    agg[p].points += Number(s.score) || 0;
-    if (String(s.won).toLowerCase() === "yes") agg[p].wins++;
-  });
+    const bar = el("span", "nom-bar");
+    bar.style.width = Math.round((count / max) * 140) + "px";
 
-  const rows = Object.values(agg).sort(
-    (a, b) => b.wins - a.wins || b.points - a.points
-  );
-  if (!rows.length) {
-    box.innerHTML = "<p>No games logged yet — add your first result above.</p>";
-    return;
-  }
-
-  box.innerHTML = "";
-  const wrap = el("div", "nes-table-responsive");
-  const t = el("table", "nes-table is-bordered is-dark");
-  t.innerHTML =
-    "<thead><tr><th>Player</th><th>Wins</th><th>Games</th><th>Points</th></tr></thead>";
-  const tb = el("tbody");
-  rows.forEach((r) => {
-    tb.appendChild(
-      el(
-        "tr",
-        null,
-        `<td>${esc(r.player)}</td><td>${r.wins}</td><td>${r.games}</td><td>${r.points}</td>`
-      )
+    row.append(
+      btn,
+      bar,
+      el("span", "nom-count", count + (count === 1 ? " vote" : " votes"))
     );
-  });
-  t.appendChild(tb);
-  wrap.appendChild(t);
-  box.appendChild(wrap);
-}
-
-function renderHistory(data) {
-  const box = $("#history");
-  const byId = {};
-  (data.scores || []).forEach((s) => {
-    (byId[s.session_id] = byId[s.session_id] || []).push(s);
-  });
-
-  const sessions = (data.sessions || [])
-    .slice()
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 10);
-
-  if (!sessions.length) {
-    box.innerHTML = "<p>No games logged yet — add your first result above.</p>";
-    return;
-  }
-
-  box.innerHTML = "";
-  sessions.forEach((sn) => {
-    const scores = (byId[sn.id] || [])
-      .slice()
-      .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
-    const line = scores
-      .map(
-        (s) =>
-          `${esc(s.player)} ${Number(s.score) || 0}` +
-          (String(s.won).toLowerCase() === "yes" ? " \u2605" : "")
-      )
-      .join("  \u00b7  ");
-
-    const row = el("div", "history-row");
-    row.innerHTML =
-      `<p><strong>${esc(sn.date)}</strong> &mdash; ${esc(sn.game)}</p>` +
-      `<p class="history-scores">${line || "(no scores)"}</p>` +
-      (sn.notes ? `<p class="nes-text is-disabled">${esc(sn.notes)}</p>` : "");
+    if (n.added_by) row.append(el("span", "nom-by", "suggested by " + esc(n.added_by)));
     box.appendChild(row);
-    box.appendChild(el("hr"));
   });
 }
 
-/* ---- log-a-game form ---- */
+async function suggestGame() {
+  const input = $("#v-suggest");
+  const game = input.value.trim();
+  if (!game) return status("Type a game name to suggest.", "err");
+  try {
+    const r = await post("suggest_game", {
+      game,
+      added_by: $("#v-name").value.trim(),
+    });
+    input.value = "";
+    status(
+      r.duplicate ? "That game's already on the list." : "Added — now tap it to vote.",
+      "ok"
+    );
+    refresh();
+  } catch (e) {
+    status(e.message, "err");
+  }
+}
+
+/* --- log form --- */
 function addPlayerRow() {
   const row = el("div", "player-row");
 
@@ -240,7 +265,6 @@ async function saveSession() {
     .filter((r) => r.player);
 
   try {
-    status("Saving\u2026");
     await post("add_session", {
       date: $("#g-date").value,
       game,
@@ -271,10 +295,23 @@ function init() {
   if (API_URL.startsWith("PASTE_")) {
     status("Set API_URL in app.js to your Apps Script /exec URL.", "err");
   }
+
+  // remember your name locally so game suggestions are attributed
+  const nameEl = $("#v-name");
+  nameEl.value = localStorage.getItem("gn_name") || "";
+  nameEl.addEventListener("change", () =>
+    localStorage.setItem("gn_name", nameEl.value.trim())
+  );
+
   $("#g-date").valueAsDate = new Date();
   addPlayerRow();
   $("#add-player").onclick = addPlayerRow;
   $("#save-session").onclick = saveSession;
+  $("#v-add").onclick = suggestGame;
+  $("#v-suggest").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") suggestGame();
+  });
+
   refresh();
 }
 

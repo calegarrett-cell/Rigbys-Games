@@ -1,126 +1,70 @@
-/**
- * Board game meetup — BoardGameGeek enrichment add-on  (bgg-enrich.gs)
- * ---------------------------------------------------------------------------
- * OPTIONAL. Paste this into the SAME Apps Script project as Code.gs
- * (File → + → Script, name it "bgg-enrich", and paste). It reuses the
- * sheet() and readTab() helpers already defined in Code.gs.
- *
- * What it does: fills a "Games" tab with cover art, player counts, play time,
- * and BGG rating, pulled from BoardGameGeek. It runs SERVER-SIDE inside Apps
- * Script, so there's no CORS problem (unlike calling BGG from the browser).
- *
- * Setup:
- *   1. Add a tab named "Games" with this exact header row:
- *        name | bgg_id | thumbnail | min_players | max_players | playtime | rating | updated_at
- *   2. Type the games you care about into the "name" column; leave the rest blank.
- *      (If you already know a game's BGG id, put it in "bgg_id" to skip the search.)
- *   3. In Code.gs, expose the tab to the site with two small edits:
- *        - add   games: "Games"          to the TABS object
- *        - add   games: readTab(TABS.games),   inside readAll()
- *   4. Run enrichGames() once from the editor to authorize and populate.
- *   5. Run installBggTrigger() once so it refreshes daily (or add a time-based
- *      trigger by hand via the clock icon in the Apps Script sidebar).
- * ---------------------------------------------------------------------------
- */
+# Rigby's Games
 
-const BGG_BASE = "https://boardgamegeek.com/xmlapi2";
+A tiny static site for a board games meetup: see who's won, vote on what to play
+next, and log results. Hosted free on GitHub Pages, with a Google Sheet as the
+database.
 
-function enrichGames() {
-  const sh = sheet("Games"); // sheet() is defined in Code.gs
-  const values = sh.getDataRange().getValues();
-  if (values.length < 2) return;
+## The page
 
-  const col = {};
-  values[0].forEach(function (h, i) { col[String(h).trim()] = i; });
+- **Rigby's Games** — the title.
+- **Next Game Night: …** — pulled live from the `Settings` tab.
+- **Hall of champions** — every session's game, winner, and date. Hover (or tap)
+  a game or winner to reveal that night's full scoreboard.
+- **Vote: next session** — approval voting. Suggest a game, then tap every game
+  you'd be happy to play; you can pick several, and tap again to remove a vote.
+- **Log a result** — records a session so it can appear in the champions list.
 
-  for (var r = 1; r < values.length; r++) {
-    var name = String(values[r][col.name] || "").trim();
-    if (!name) continue;
+## Files
 
-    var id = String(values[r][col.bgg_id] || "").trim();
-    try {
-      if (!id) {
-        id = bggSearchId(name);
-        if (!id) continue;
-      }
-      var g = bggThing(id);
-      if (!g) continue;
+| File | Where it lives | What it is |
+|------|----------------|------------|
+| `index.html` | repo (GitHub Pages) | page markup |
+| `app.js` | repo | data, rendering, and actions |
+| `styles.css` | repo | retro styling on top of NES.css |
+| `Code.gs` | Apps Script editor | the JSON API (not a repo file) |
 
-      setCell(sh, r, col.bgg_id, id);
-      setCell(sh, r, col.thumbnail, g.thumbnail);
-      setCell(sh, r, col.min_players, g.minPlayers);
-      setCell(sh, r, col.max_players, g.maxPlayers);
-      setCell(sh, r, col.playtime, g.playingTime);
-      setCell(sh, r, col.rating, g.rating);
-      setCell(sh, r, col.updated_at, new Date().toISOString());
-    } catch (err) {
-      Logger.log("BGG enrich failed for " + name + ": " + err);
-    }
-    Utilities.sleep(1500); // be polite to BGG's servers / rate limits
-  }
-}
+## Google Sheet tabs
 
-// Resolve a game name to a BGG id (first match).
-function bggSearchId(name) {
-  var xml = fetchXml(BGG_BASE + "/search?type=boardgame&query=" + encodeURIComponent(name));
-  if (!xml) return "";
-  var items = xml.getRootElement().getChildren("item");
-  return items.length ? items[0].getAttribute("id").getValue() : "";
-}
+Header row (row 1) for each tab. Column order matters on the tabs the script
+writes to (`Sessions`, `Scores`, `Nominations`, `Votes`).
 
-// Fetch and parse a single game's details.
-function bggThing(id) {
-  var xml = fetchXml(BGG_BASE + "/thing?stats=1&id=" + encodeURIComponent(id));
-  if (!xml) return null;
-  var item = xml.getRootElement().getChild("item");
-  if (!item) return null;
+| Tab | Header row |
+|-----|------------|
+| `Settings` | `key \| value` |
+| `Sessions` | `id \| date \| game \| notes \| created_at` |
+| `Scores` | `id \| session_id \| player \| score \| won \| created_at` |
+| `Nominations` | `id \| game \| added_by \| created_at` |
+| `Votes` | `id \| nomination_id \| voter_id \| created_at` |
 
-  return {
-    thumbnail: nodeText(item.getChild("thumbnail")),
-    minPlayers: nodeAttr(item.getChild("minplayers"), "value"),
-    maxPlayers: nodeAttr(item.getChild("maxplayers"), "value"),
-    playingTime: nodeAttr(item.getChild("playingtime"), "value"),
-    rating: bggAverage(item),
-  };
-}
+Set the subtitle by adding a row to `Settings`:
 
-function bggAverage(item) {
-  var stats = item.getChild("statistics");
-  var ratings = stats ? stats.getChild("ratings") : null;
-  var avg = ratings ? nodeAttr(ratings.getChild("average"), "value") : "";
-  var n = Number(avg);
-  return n ? Math.round(n * 10) / 10 : "";
-}
+```
+next_game_night | Fri Nov 21 · 7pm @ Rigby's
+```
 
-// --- fetch + tiny XML helpers ---
-function fetchXml(url) {
-  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  var code = res.getResponseCode();
-  if (code === 202) { // BGG sometimes queues a request — retry once
-    Utilities.sleep(2500);
-    res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    code = res.getResponseCode();
-  }
-  return code === 200 ? XmlService.parse(res.getContentText()) : null;
-}
+## Deploy / update
 
-function nodeText(node) { return node ? node.getText() : ""; }
+1. Paste `Code.gs` into the Sheet's Apps Script editor (Extensions → Apps Script).
+2. Deploy as a Web app — Execute as **Me**, Who has access **Anyone** — and copy
+   the `/exec` URL. When updating later, use **Deploy → Manage deployments** and
+   edit the *existing* deployment so the URL stays the same.
+3. Put the `/exec` URL in `app.js` (`API_URL`), push `index.html`, `app.js`, and
+   `styles.css`, and enable GitHub Pages.
 
-function nodeAttr(node, name) {
-  if (!node) return "";
-  var a = node.getAttribute(name);
-  return a ? a.getValue() : "";
-}
+## Running the meetup
 
-function setCell(sh, rowIndex0, colIndex0, value) {
-  if (colIndex0 == null || colIndex0 < 0) return;
-  sh.getRange(rowIndex0 + 1, colIndex0 + 1).setValue(value);
-}
+- **Winners** appear automatically when you log a result with a player marked
+  "win." If no one is marked, the top score is shown as the winner.
+- **Start a fresh vote**: clear the rows in `Nominations` and `Votes`.
+- **Set the next game night / fix data**: edit the Sheet directly.
 
-// Run once to refresh the data every day at ~4am.
-function installBggTrigger() {
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === "enrichGames") ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger("enrichGames").timeBased().everyDays(1).atHour(4).create();
-}
+## Gotchas
+
+- Writes use `text/plain` on purpose — it skips the CORS preflight Apps Script
+  web apps can't answer. Don't change it to `application/json`.
+- After editing `Code.gs`, redeploy via **Manage deployments** so `/exec` stays put.
+- No keep-alive needed — Sheets and Apps Script don't sleep.
+
+## Cost
+
+$0 at meetup scale.
