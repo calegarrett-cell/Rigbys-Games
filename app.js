@@ -1,7 +1,7 @@
 /* Rigby's Games — front-end logic (app.js). Goes in your GitHub repo. */
 
 // 1) Paste your Apps Script web-app /exec URL here after deploying Code.gs:
-const API_URL = "PASTE_YOUR_WEB_APP_EXEC_URL_HERE";
+const API_URL = https://script.google.com/macros/s/AKfycby-gQkBNdSh2pc1v-iZvJgi8Euf81zf9wSXYvcYgKut-EAmPejPkiTm4BkWccavSxNm/exec;
 
 // 2) If you set a SECRET in Code.gs, put the same value here (else leave ""):
 const SECRET = "";
